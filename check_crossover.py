@@ -92,34 +92,33 @@ def main():
 
     print(f"\n📊 نتیجه: {len(crossovers)} کراس از {len(symbols)} symbol")
 
- if crossovers:
-    msg = "🚨 <b>EMA CROSSOVER ALERT</b> 🚨\n"
-    msg += "<b>[F]</b>\n\n"  # تگ F برای فیوچرز
-    msg += f"📊 Scanned: {len(symbols)} pairs | 🎯 Signals: {len(crossovers)}\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
-    
-    for c in crossovers:
-        # تبدیل VELVET/USDT:USDT به VELVET/USD
-        base_symbol = c['symbol'].split('/')[0]
-        display_name = f"{base_symbol}/USD"
+    if crossovers:
+        msg = "🚨 <b>EMA CROSSOVER ALERT</b> 🚨\n"
+        msg += "<b>[F]</b>\n\n"
+        msg += f"📊 Scanned: {len(symbols)} pairs | 🎯 Signals: {len(crossovers)}\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        # ساخت لینک TradingView برای فیوچرز
-        symbol_tv = c['symbol'].replace('/', '').replace(':USDT', '.P')
-        tradingview_link = f"https://www.tradingview.com/chart/?symbol={symbol_tv}"
+        for c in crossovers:
+            # تبدیل VELVET/USDT:USDT به VELVET/USD
+            base_symbol = c['symbol'].split('/')[0]
+            display_name = f"{base_symbol}/USD"
+            
+            # ساخت لینک TradingView برای فیوچرز
+            symbol_tv = c['symbol'].replace('/', '').replace(':USDT', '.P')
+            tradingview_link = f"https://www.tradingview.com/chart/?symbol={symbol_tv}"
+            
+            emoji = "🟢" if c['cross'] == 'BULLISH' else "🔴"
+            arrow = "📈" if c['cross'] == 'BULLISH' else "📉"
+            
+            msg += f"{emoji} <a href='{tradingview_link}'><b>{display_name}</b></a>\n"
+            msg += f"{arrow} {c['cross']}\n"
+            msg += f"💰 Price: <b>{c['price']}</b>\n"
+            msg += "────────────────────\n\n"
         
-        emoji = "🟢" if c['cross'] == 'BULLISH' else "🔴"
-        arrow = "📈" if c['cross'] == 'BULLISH' else "📉"
+        msg += "🔗 <i>Tap on symbol to open TradingView chart</i>"
         
-        msg += f"{emoji} <a href='{tradingview_link}'><b>{display_name}</b></a>\n"
-        msg += f"{arrow} {c['cross']}\n"
-        msg += f"💰 Price: <b>{c['price']}</b>\n"
-        msg += "────────────────────\n\n"
-    
-    msg += "🔗 <i>Tap on symbol to open TradingView chart</i>"
-    
-    send_telegram(msg)
-    print("✅ Telegram message sent")
-     
+        send_telegram(msg)
+        print("✅ Telegram message sent")
     else:
         print("هیچ کراسی پیدا نشد، پیامی ارسال نشد")
 
