@@ -51,10 +51,9 @@ def get_iran_shamsi_timestamp():
 
 
 def get_tradingview_link(symbol):
+    """لینک TradingView که مستقیم باز شود - بدون نیاز به permission"""
     base = symbol.split('/')[0]
-    tv_symbol = f":{base}USDT"
-    encoded_symbol = urllib.parse.quote(tv_symbol)
-    return f"https://www.tradingview.com/chart/?symbol={encoded_symbol}"
+    return f"https://www.tradingview.com/symbols/XT-{base}USDT/"
 
 
 def get_previous_data():
@@ -90,6 +89,7 @@ def get_previous_data():
 
 
 def write_to_google_sheet(results):
+    """نوشتن بهینه در گوگل شیت - فقط 6 API Call"""
     try:
         creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
         scopes = ['https://www.googleapis.com/auth/spreadsheets']
@@ -97,14 +97,16 @@ def write_to_google_sheet(results):
         client = gspread.authorize(creds)
         
         sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-        sheet.clear()
         
-        headers = ["Timestamp", "Symbol", "Price ($)", "EMA50 ($)", "EMA200 ($)", "Risk %", "TradingView"]
-        sheet.append_row(headers)
-        
+        # ساخت همه داده‌ها یکجا
         shamsi_ts = get_iran_shamsi_timestamp()
+        
+        # هدر
+        all_data = [["Timestamp", "Symbol", "Price ($)", "EMA50 ($)", "EMA200 ($)", "Risk %", "TradingView"]]
+        
+        # داده‌ها
         for row in results:
-            sheet.append_row([
+            all_data.append([
                 shamsi_ts,
                 row['Symbol'],
                 row['Price ($)'],
@@ -114,9 +116,15 @@ def write_to_google_sheet(results):
                 row['TradingView Link']
             ])
         
-        sheet.format('A1:G1', {'textFormat': {'bold': True}})
+        # پاک کردن و نوشتن یکجا (بهینه)
+        sheet.clear()                              # 1 API call
+        sheet.update('A1', all_data)               # 1 API call (همه داده‌ها یکجا!)
+        sheet.format('A1:G1', {'textFormat': {'bold': True}})  # 1 API call
         
-        print(f"✅ Results written to Google Sheet: {len(results)} coins")
+        # تنظیم عرض ستون‌ها
+        sheet.columns_auto_resize(1, 7)            # 1 API call
+        
+        print(f"✅ Results written to Google Sheet: {len(results)} coins (6 API calls)")
         return True
         
     except Exception as e:
@@ -158,15 +166,15 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
     """ارسال گزارش جامع به تلگرام"""
     timestamp = get_iran_shamsi_timestamp()
     
-    # محاسبه آمار
     msg = f"📊 <b>XT FUTURES SCANNER REPORT</b>\n"
     msg += f"🕐 <b>Time:</b> {timestamp}\n"
     msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
-    # آمار کلی
+    # آمار کلی با فیلترهای جداگانه
     msg += f"🔍 <b>Total Scanned:</b> {total_scanned} pairs\n"
     msg += f"✅ <b>Selected:</b> {total_selected} coins\n"
-    msg += f"📈 <b>Filter:</b> Price &gt; EMA50 &gt; EMA200 (1H)\n\n"
+    msg += f"📈 <b>Filter-1:</b> Price &gt; EMA50 (1D)\n"
+    msg += f"📈 <b>Filter-2:</b> Price &gt; EMA50 &gt; EMA200 (1H)\n\n"
     
     # تغییرات
     if added_symbols or removed_symbols:
@@ -178,10 +186,8 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
             for symbol in sorted(added_symbols):
                 tv_link = get_tradingview_link(symbol)
                 base = symbol.split('/')[0]
-                current = new_data.get(symbol, {})
-                price = format_number(current.get('price', 0))
-                risk = current.get('risk', 0)
-                msg += f"  ➕ <a href='{tv_link}'>{base}/USDT</a> | ${price} | Risk: {risk}%\n"
+                # فقط نام ارز با لینک - بدون قیمت و ریسک
+                msg += f"  ➕ <a href='{tv_link}'>{base}/USDT</a>\n"
             msg += "\n"
         
         if removed_symbols:
@@ -207,7 +213,6 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
                 })
         
         if price_changes:
-            # بیشترین افزایش
             price_changes.sort(key=lambda x: x['change'], reverse=True)
             
             msg += "━━━━━━━━━━━━━━━━━━━━\n"
@@ -219,7 +224,6 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
                 tv_link = get_tradingview_link(item['symbol'])
                 msg += f"  📈 <a href='{tv_link}'>{base}</a>: {item['change']:+.2f}% (${format_number(item['old_price'])} → ${format_number(item['new_price'])})\n"
             
-            # بیشترین کاهش
             losers = sorted(price_changes, key=lambda x: x['change'])[:3]
             if losers and losers[0]['change'] < 0:
                 msg += f"\n🔴 <b>Biggest Losers:</b>\n"
@@ -230,7 +234,7 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
             
             msg += "\n"
     
-    # بیشترین ریسک
+    # تحلیل ریسک
     if new_data:
         sorted_by_risk = sorted(new_data.items(), key=lambda x: x[1].get('risk', 0), reverse=True)
         
@@ -244,7 +248,6 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
             risk = data.get('risk', 0)
             msg += f"  ⚡ <a href='{tv_link}'>{base}</a>: {risk}%\n"
         
-        # کمترین ریسک
         msg += f"\n💚 <b>Lowest Risk:</b>\n"
         for symbol, data in sorted_by_risk[-3:]:
             base = symbol.split('/')[0]
@@ -254,22 +257,21 @@ def send_telegram_report(total_scanned, total_selected, new_data, previous_data,
         
         msg += "\n"
     
-    # لیست کامل (حداکثر 15 مورد)
+    # لیست فعلی - فقط 3 ارز
     if new_data:
         msg += "━━━━━━━━━━━━━━━━━━━━\n"
-        msg += f"📋 <b>CURRENT LIST (Top 15)</b>\n\n"
+        msg += f"📋 <b>CURRENT LIST (Top 3)</b>\n\n"
         
         sorted_list = sorted(new_data.items(), key=lambda x: x[1].get('risk', 0))
         
-        for i, (symbol, data) in enumerate(sorted_list[:15], 1):
+        for i, (symbol, data) in enumerate(sorted_list[:3], 1):
             base = symbol.split('/')[0]
             tv_link = get_tradingview_link(symbol)
-            price = format_number(data.get('price', 0))
-            risk = data.get('risk', 0)
-            msg += f"{i}. <a href='{tv_link}'>{base}</a> | ${price} | Risk: {risk}%\n"
+            # فقط نام ارز با لینک - بدون قیمت و ریسک
+            msg += f"{i}. <a href='{tv_link}'>{base}</a>\n"
         
-        if len(new_data) > 15:
-            msg += f"\n<i>... and {len(new_data) - 15} more coins</i>\n"
+        if len(new_data) > 3:
+            msg += f"\n<i>... and {len(new_data) - 3} more coins</i>\n"
     
     msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
     msg += f"🔗 <a href='https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit'>📊 View Full Data in Google Sheet</a>"
@@ -368,7 +370,7 @@ def scan_xt_futures():
     print(f"✅ Scan complete — {len(df)} coins selected")
     print("="*70)
 
-    # نوشتن در گوگل شیت
+    # نوشتن در گوگل شیت (بهینه)
     write_to_google_sheet(results)
     
     # محاسبه تغییرات
