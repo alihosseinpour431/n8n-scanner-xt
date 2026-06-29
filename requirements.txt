@@ -1,5 +1,8 @@
 ccxt
 pandas
-requests
+tqdm
+jdatetime
+pytz
 gspread
 google-auth
+openpyxl
