@@ -29,4 +29,6 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
         run: python future_scanner.py
