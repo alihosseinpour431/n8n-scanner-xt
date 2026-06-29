@@ -1,6 +1,5 @@
 # ==========================================
 # XT.com Futures Scanner - Daily & Hourly EMA
-# اجرا روی GitHub Actions
 # ==========================================
 
 import ccxt
@@ -19,7 +18,6 @@ from google.oauth2.service_account import Credentials
 
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
-# تنظیمات از environment variables
 SHEET_ID = os.environ['SHEET_ID']
 SHEET_NAME = os.environ.get('SHEET_NAME', 'Bullish_Trend')
 GOOGLE_CREDENTIALS_JSON = os.environ['GOOGLE_CREDENTIALS_JSON']
@@ -37,7 +35,6 @@ def calculate_ema(data, period):
 
 
 def get_iran_shamsi_timestamp():
-    """تاریخ و ساعت شمسی ایران"""
     tehran_tz = pytz.timezone('Asia/Tehran')
     now_tehran = datetime.now(tehran_tz)
     jalali_date = jdatetime.date.fromgregorian(
@@ -58,30 +55,23 @@ def get_tradingview_link(symbol):
 
 
 def write_to_google_sheet(results):
-    """نوشتن نتایج در گوگل شیت"""
     try:
         creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
         scopes = ['https://www.googleapis.com/auth/spreadsheets']
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
         
-        # باز کردن شیت
         sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-        
-        # پاک کردن محتوای قبلی
         sheet.clear()
         
-        # اضافه کردن هدر
         timestamp = get_iran_shamsi_timestamp()
         header = [f"XT Futures EMA Scan - {timestamp} | تعداد: {len(results)}"]
         sheet.append_row(header)
         sheet.append_row([""])
         
-        # هدر ستون‌ها
         headers = ["Timestamp", "Symbol", "Price ($)", "EMA50 ($)", "Distance %", "TradingView"]
         sheet.append_row(headers)
         
-        # اضافه کردن داده‌ها
         shamsi_ts = get_iran_shamsi_timestamp()
         for row in results:
             sheet.append_row([
@@ -93,18 +83,9 @@ def write_to_google_sheet(results):
                 row['TradingView Link']
             ])
         
-        # فرمت‌بندی
         sheet.format('A1:F1', {'textFormat': {'bold': True, 'fontSize': 14}})
         sheet.format('A3:F3', {'textFormat': {'bold': True}})
         sheet.format('A4:F4', {'textFormat': {'bold': True}})
-        
-        # عرض ستون‌ها
-        sheet.column_dimensions['A'].width = 20
-        sheet.column_dimensions['B'].width = 20
-        sheet.column_dimensions['C'].width = 15
-        sheet.column_dimensions['D'].width = 15
-        sheet.column_dimensions['E'].width = 12
-        sheet.column_dimensions['F'].width = 60
         
         print(f"✅ نتایج در گوگل شیت نوشته شد: {len(results)} ارز")
         return True
@@ -145,7 +126,6 @@ def scan_xt_futures():
                 skipped_non_ascii += 1
                 continue
 
-            # فیلتر ۱: روزانه
             ohlcv_1d = exchange.fetch_ohlcv(symbol, timeframe='1d', limit=100)
             if len(ohlcv_1d) < 50:
                 continue
@@ -157,7 +137,6 @@ def scan_xt_futures():
             if current_price <= ema50_1d:
                 continue
 
-            # فیلتر ۲: ساعتی
             ohlcv_1h = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=250)
             if len(ohlcv_1h) < 200:
                 continue
@@ -197,7 +176,6 @@ def scan_xt_futures():
     print(f"✅ اسکن کامل شد — {len(df)} ارز با شرایط مطلوب یافت شد")
     print("="*70)
 
-    # نوشتن در گوگل شیت
     write_to_google_sheet(results)
     
     print(f"📅 تاریخ شمسی: {get_iran_shamsi_timestamp()}")
