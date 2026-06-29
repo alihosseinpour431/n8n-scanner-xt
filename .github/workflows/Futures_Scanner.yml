@@ -1,17 +1,18 @@
-name: Check EMA Crossover
+name: XT Futures EMA Scanner
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
-  workflow_dispatch:
+    # هر 3 ساعت (در دقیقه 0)
+    - cron: '0 */3 * * *'
+  workflow_dispatch:  # امکان اجرای دستی
 
 jobs:
-  check:
+  scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-
+    timeout-minutes: 15
+    
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -20,13 +21,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
 
-      - name: Run crossover check
+      - name: Run Scanner
         env:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
-        run: python check_crossover.py
+        run: python scanner.py
